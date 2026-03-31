@@ -3,5 +3,7 @@ yfinance
 pandas
 pandas-ta
 plotly
-psycopg2
+numpy
+scipy
+psycopg2-binary
 sqlalchemy
