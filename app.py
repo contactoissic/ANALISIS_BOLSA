@@ -194,7 +194,7 @@ with tab_swing:
         """)
         
     if st.button("🔄 Actualizar Radar Swing", key="btn_swing"):
-        pass
+        buscar_swing_trading.clear()
     with st.spinner("Ejecutando cazadores de Momentum de corto plazo..."):
         df_sw_buy, df_sw_sell = buscar_swing_trading()
     if not df_sw_buy.empty:
@@ -249,7 +249,7 @@ with tab_value:
         """)
         
     if st.button("🔄 Actualizar Radar Value", key="btn_value"):
-        pass
+        buscar_value_investing.clear()
     with st.spinner("Analizando balances financieros institucionales..."):
         df_v_buy, df_v_sell = buscar_value_investing()
     if not df_v_buy.empty:
