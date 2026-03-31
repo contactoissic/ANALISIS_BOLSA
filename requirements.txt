@@ -1,9 +1,7 @@
 streamlit
-yfinance
-pandas
+yfinance 
+pandas<2.0.0
 pandas-ta
 plotly
-numpy
-scipy
 psycopg2-binary
 sqlalchemy
