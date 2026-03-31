@@ -1,3 +1,5 @@
+setuptools
+packaging
 streamlit
 yfinance 
 pandas<2.0.0
