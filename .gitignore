@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Streamlit
+.streamlit/config.toml
+# Pero SI queremos subir .streamlit/ secrets (OJO: usualmente NO se suben secrets, pero Streamlit Cloud los pide en su interfaz, no en el archivo)
+
+# Bases de datos locales
+*.db
+*.sqlite3
+
+# Otros
+.DS_Store
+.idea/
+.vscode/
