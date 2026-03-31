@@ -1,9 +1,11 @@
 setuptools
 packaging
 streamlit
-yfinance 
-pandas<2.0.0
-pandas-ta
+yfinance
+pandas==1.5.3
+numpy==1.26.4
+scipy==1.11.4
+pandas-ta==0.3.14b
 plotly
 psycopg2-binary
 sqlalchemy
