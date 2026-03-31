@@ -12,16 +12,19 @@ def get_connection():
     """
     Retorna una conexión activa. 
     Si detecta secretos de PostgreSQL (Supabase) en Streamlit Cloud, usa Postgres.
-    De lo contrario, usa SQLite local.
+    De lo contrario, usa SQLite local. Si Postgres falla, hace fallback a SQLite.
     """
     if "connections" in st.secrets and "postgresql" in st.secrets.connections:
         # Modo Cloud: Supabase
         try:
             conn = st.connection("postgresql", type="sql")
+            # Prueba de ping rápida para validar las credenciales
+            conn.query("SELECT 1")
             return conn, "POSTGRES"
         except Exception as e:
-            st.error(f"Error conectando a Supabase: {e}")
-            return None, "ERROR"
+            st.warning("⚠️ Error de credenciales con la Bóveda en la nube (Supabase). Se activó el guardado en 'Modo Temporal' (SQLite). Revisa tus Secrets.")
+            conn = sqlite3.connect(DB_NAME, check_same_thread=False)
+            return conn, "SQLITE"
     else:
         # Modo Local: SQLite
         conn = sqlite3.connect(DB_NAME, check_same_thread=False)
