@@ -3,5 +3,5 @@ yfinance
 pandas
 pandas-ta
 plotly
-psycopg2-binary
+psycopg2
 sqlalchemy
