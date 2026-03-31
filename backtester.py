@@ -8,7 +8,7 @@
 
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
+from backend import add_ema, add_sma, add_rsi, add_atr
 from datetime import datetime
 
 COMISION_GBM = 0.0025   # 0.25% por lado
@@ -43,12 +43,12 @@ def ejecutar_backtest(ticker: str, capital_inicial: float, pct_por_trade: float,
         df.index = df.index.tz_localize(None)
 
     # ── Calcular Indicadores ──
-    df.ta.rsi(length=14, append=True)
-    df.ta.ema(length=9,  append=True)
-    df.ta.ema(length=21, append=True)
-    df.ta.sma(length=50, append=True)
-    df.ta.sma(length=200, append=True)
-    df.ta.atr(length=14, append=True)
+    add_rsi(df, length=14)
+    add_ema(df, length=9)
+    add_ema(df, length=21)
+    add_sma(df, length=50)
+    add_sma(df, length=200)
+    add_atr(df, length=14)
     df.dropna(inplace=True)
 
     # ── Motor de Simulación ──
