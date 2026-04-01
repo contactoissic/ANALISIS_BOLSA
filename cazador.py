@@ -1,5 +1,4 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 from backend import analizar_swing, analizar_value, obtener_dividendos
 from concurrent.futures import ThreadPoolExecutor

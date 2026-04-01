@@ -1,5 +1,5 @@
 streamlit
-yfinance>=0.2.37
+yahooquery
 pandas
 plotly
 psycopg2-binary

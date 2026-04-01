@@ -6,9 +6,9 @@
 ╚══════════════════════════════════════════════════════════╝
 """
 
-import yfinance as yf
+from yahooquery import Ticker
 import pandas as pd
-from backend import add_ema, add_sma, add_rsi, add_atr, yf_session
+from backend import add_ema, add_sma, add_rsi, add_atr
 from datetime import datetime
 
 COMISION_GBM = 0.0025   # 0.25% por lado
@@ -31,15 +31,29 @@ def ejecutar_backtest(ticker: str, capital_inicial: float, pct_por_trade: float,
     - modo             : "SWING" (corto plazo) o "VALUE" (largo plazo)
     """
     # ── Descargar datos históricos ──
-    t = yf.Ticker(ticker, session=yf_session)
-    df = t.history(period=periodo, interval="1d", actions=True)
-    moneda = t.info.get("currency", "USD") if hasattr(t, 'info') else "USD"
+    t = Ticker(ticker)
+    df = t.history(period=periodo)
+    
+    price_info = t.price.get(ticker, {})
+    if isinstance(price_info, str): price_info = {}
+    moneda = price_info.get("currency", "USD")
 
-    if df.empty or len(df) < 60:
+    if df.empty or 'close' not in df.columns:
+        return {"error": f"Datos insuficientes para {ticker}. Mínimo 60 días de historial."}
+        
+    if isinstance(df.index, pd.MultiIndex):
+        df = df.xs(ticker, level='symbol')
+        
+    df = df.rename(columns={
+        'open': 'Open', 'high': 'High', 'low': 'Low', 
+        'close': 'Close', 'volume': 'Volume', 'dividends': 'Dividends'
+    })
+
+    if len(df) < 60:
         return {"error": f"Datos insuficientes para {ticker}. Mínimo 60 días de historial."}
 
     df = df.copy()
-    if df.index.tz is not None:
+    if hasattr(df.index, 'tz') and getattr(df.index, 'tz', None) is not None:
         df.index = df.index.tz_localize(None)
 
     # ── Calcular Indicadores ──

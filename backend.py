@@ -1,14 +1,6 @@
-import yfinance as yf
+from yahooquery import Ticker
 import pandas as pd
 from datetime import datetime
-import requests
-
-# ── Configurar un Sesion de Requests para evadir el Anti-Bot de Yahoo ──
-yf_session = requests.Session()
-yf_session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-})
 
 
 # ─────────────────────────────────────────────
@@ -53,18 +45,24 @@ def analizar_swing(ticker_raw: str) -> dict:
     """Estrategia de Corto Plazo: EMA 9/21, MACD, Volumen."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker, session=yf_session)
+        t = Ticker(ticker)
         df = t.history(period="6mo")
-        info = t.info
-        moneda = info.get("currency", "USD")
+        if df.empty or 'close' not in df.columns:
+            return {"error": f"No se pudo obtener {ticker}"}
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.xs(ticker, level='symbol')
+        df = df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
+        price_info = t.price.get(ticker, {})
+        if isinstance(price_info, str): price_info = {}
+        moneda = price_info.get("currency", "USD")
     except:
-        return {"error": f"No se pudo obtener {ticker}"}
+        return {"error": f"Error interno al obtener {ticker}"}
 
     if df.empty or len(df) < 30:
         return {"error": f"Datos insuficientes para {ticker}"}
 
     df = df.copy()
-    if df.index.tz is not None:
+    if hasattr(df.index, 'tz') and getattr(df.index, 'tz', None) is not None:
         df.index = df.index.tz_localize(None)
 
     add_ema(df, 9)
@@ -133,15 +131,27 @@ def analizar_value(ticker_raw: str) -> dict:
     """Estrategia de Largo Plazo: SMA 50/200, P/E, Deuda/Capital."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker, session=yf_session)
+        t = Ticker(ticker)
         df = t.history(period="3y")
-        info = t.info
-        moneda      = info.get("currency", "USD")
-        per         = info.get("trailingPE",  info.get("forwardPE", None))
+        if df.empty or 'close' not in df.columns:
+            return {"error": f"No se pudo obtener data de {ticker}"}
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.xs(ticker, level='symbol')
+        df = df.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
+        
+        summary = t.summary_detail.get(ticker, {})
+        if isinstance(summary, str): summary = {}
+        financial = t.financial_data.get(ticker, {})
+        if isinstance(financial, str): financial = {}
+        price_info = t.price.get(ticker, {})
+        if isinstance(price_info, str): price_info = {}
+        
+        moneda      = price_info.get("currency", "USD")
+        per         = summary.get("trailingPE", summary.get("forwardPE", None))
         per         = round(float(per), 2) if per else "N/A"
-        debt_equity = info.get("debtToEquity", None)
+        debt_equity = financial.get("debtToEquity", None)
         debt_equity = round(float(debt_equity) / 100, 2) if debt_equity else "N/A"
-        div_yield   = info.get("dividendYield", 0)
+        div_yield   = summary.get("dividendYield", 0)
         div_yield   = round(float(div_yield) * 100, 2) if div_yield else 0.0
     except:
         return {"error": f"No se pudo obtener info fundamental de {ticker}"}
@@ -150,7 +160,7 @@ def analizar_value(ticker_raw: str) -> dict:
         return {"error": f"Historial insuficiente para análisis Value de {ticker}"}
 
     df = df.copy()
-    if df.index.tz is not None:
+    if hasattr(df.index, 'tz') and getattr(df.index, 'tz', None) is not None:
         df.index = df.index.tz_localize(None)
 
     add_sma(df, 50)
@@ -210,18 +220,21 @@ def obtener_dividendos(ticker_raw: str) -> dict:
     """Extrae info de dividendos: yield, frecuencia, próximo pago."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker, session=yf_session)
-        info = t.info
-        nombre     = info.get("longName", ticker)
-        moneda     = info.get("currency", "USD")
-        yield_pct  = info.get("dividendYield", 0)
+        t = Ticker(ticker)
+        summary = t.summary_detail.get(ticker, {})
+        if isinstance(summary, str): summary = {}
+        price_info = t.price.get(ticker, {})
+        if isinstance(price_info, str): price_info = {}
+        
+        nombre     = price_info.get("longName", price_info.get("shortName", ticker))
+        moneda     = price_info.get("currency", "USD")
+        yield_pct  = summary.get("dividendYield", 0)
         yield_pct  = round(float(yield_pct) * 100, 2) if yield_pct else 0.0
-        div_rate   = info.get("dividendRate", 0) or 0.0
-        ex_date    = info.get("exDividendDate", None)
-        frecuencia = info.get("dividendFrequency", "N/A")
-        freq_map   = {1: "Anual", 2: "Semi-anual", 4: "Trimestral", 12: "Mensual"}
-        frecuencia = freq_map.get(frecuencia, str(frecuencia))
-        ex_date_str = datetime.fromtimestamp(ex_date).strftime("%Y-%m-%d") if ex_date else "N/A"
+        div_rate   = summary.get("dividendRate", 0) or 0.0
+        ex_date    = summary.get("exDividendDate", None)
+        
+        frecuencia = summary.get("dividendFrequency", "S/D") 
+        ex_date_str = str(ex_date).split(' ')[0] if ex_date else "N/A"
         paga_div = yield_pct > 0
         return {
             "Ticker": ticker, "Nombre": nombre, "Moneda": moneda,

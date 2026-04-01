@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from datetime import datetime
-import yfinance as yf
 import sqlalchemy
 from sqlalchemy import text
 
