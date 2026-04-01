@@ -1,6 +1,15 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+import requests
+
+# ── Configurar un Sesion de Requests para evadir el Anti-Bot de Yahoo ──
+yf_session = requests.Session()
+yf_session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+})
+
 
 # ─────────────────────────────────────────────
 #  INDICADORES TÉCNICOS NATIVOS (PANDAS PURO)
@@ -44,7 +53,7 @@ def analizar_swing(ticker_raw: str) -> dict:
     """Estrategia de Corto Plazo: EMA 9/21, MACD, Volumen."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=yf_session)
         df = t.history(period="6mo")
         info = t.info
         moneda = info.get("currency", "USD")
@@ -124,7 +133,7 @@ def analizar_value(ticker_raw: str) -> dict:
     """Estrategia de Largo Plazo: SMA 50/200, P/E, Deuda/Capital."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=yf_session)
         df = t.history(period="3y")
         info = t.info
         moneda      = info.get("currency", "USD")
@@ -201,7 +210,7 @@ def obtener_dividendos(ticker_raw: str) -> dict:
     """Extrae info de dividendos: yield, frecuencia, próximo pago."""
     ticker = str(ticker_raw).strip().split(',')[0].split(' ')[0].upper()
     try:
-        t = yf.Ticker(ticker)
+        t = yf.Ticker(ticker, session=yf_session)
         info = t.info
         nombre     = info.get("longName", ticker)
         moneda     = info.get("currency", "USD")

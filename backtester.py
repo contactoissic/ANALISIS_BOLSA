@@ -8,7 +8,7 @@
 
 import yfinance as yf
 import pandas as pd
-from backend import add_ema, add_sma, add_rsi, add_atr
+from backend import add_ema, add_sma, add_rsi, add_atr, yf_session
 from datetime import datetime
 
 COMISION_GBM = 0.0025   # 0.25% por lado
@@ -31,7 +31,7 @@ def ejecutar_backtest(ticker: str, capital_inicial: float, pct_por_trade: float,
     - modo             : "SWING" (corto plazo) o "VALUE" (largo plazo)
     """
     # ── Descargar datos históricos ──
-    t = yf.Ticker(ticker)
+    t = yf.Ticker(ticker, session=yf_session)
     df = t.history(period=periodo, interval="1d", actions=True)
     moneda = t.info.get("currency", "USD") if hasattr(t, 'info') else "USD"
 

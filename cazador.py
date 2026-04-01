@@ -64,7 +64,16 @@ def _run_parallel(fn, tickers):
             return None if "error" in res else res
         except:
             return None
-    with ThreadPoolExecutor(max_workers=20) as ex:
+    import time
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        def _proc(ticker):
+            try:
+                # Agregamos micro-pausa para engañar al sistema anti-bot de Yahoo
+                time.sleep(0.5)
+                res = fn(ticker)
+                return None if "error" in res else res
+            except:
+                return None
         for r in ex.map(_proc, tickers):
             if r:
                 resultados.append(r)
