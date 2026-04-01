@@ -336,8 +336,13 @@ with tab_lupa:
                 st.subheader("Gráfica de Precio (6 Meses)")
                 hist = None
                 try:
-                    hist = yf.Ticker(ticker_input).history(period="6mo")
-                    if hist.index.tz is not None:
+                    from yahooquery import Ticker
+                    t = Ticker(ticker_input)
+                    hist = t.history(period="6mo")
+                    if isinstance(hist.index, pd.MultiIndex):
+                        hist = hist.xs(ticker_input, level='symbol')
+                    hist = hist.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'volume': 'Volume'})
+                    if hasattr(hist.index, 'tz') and getattr(hist.index, 'tz', None) is not None:
                         hist.index = hist.index.tz_localize(None)
                 except:
                     hist = None
@@ -393,10 +398,34 @@ with tab_lupa:
                 st.metric("🎯 Target (1:3)", f"{resultado['Target']} {moneda}")
 
                 st.divider()
-                st.caption("Simulación de Compra (Fracciones OK)")
-                cantidad = st.number_input(f"Cantidad {ticker_input}:", min_value=0.001, value=1.0, step=0.001, format="%.3f")
-                monto_sim = round(cantidad * resultado['Precio'], 2)
-                st.caption(f"≈ Monto: {monto_sim} {moneda}")
+                st.caption("Calculadora de Ingreso Múltiple (Fracciones o Capital Libre)")
+                
+                # Fetch live exchange rate for calculation
+                usd_mxn_live = obtener_tipo_cambio()
+                
+                modo_compra = st.radio(
+                    "¿Cómo quieres dictar tu compra?",
+                    ["🎯 Por Títulos", "💵 Presupuesto USD", "🇲🇽 Presupuesto MXN"],
+                    horizontal=True
+                )
+                
+                if modo_compra == "🎯 Por Títulos":
+                    cantidad = st.number_input(f"Cantidad a Comprar ({ticker_input}):", min_value=0.001, value=1.0, step=0.001, format="%.3f")
+                    monto_usd = round(cantidad * resultado['Precio'], 2)
+                    monto_mxn = round(monto_usd * usd_mxn_live, 2)
+                    st.caption(f"≈ Consumirá: **${monto_usd} USD** | (${monto_mxn} MXN)")
+                
+                elif modo_compra == "💵 Presupuesto USD":
+                    monto_usd = st.number_input(f"Inversión Libre en USD:", min_value=1.0, value=100.0, step=10.0, format="%.2f")
+                    cantidad = monto_usd / resultado['Precio']
+                    monto_mxn = round(monto_usd * usd_mxn_live, 2)
+                    st.caption(f"≈ Equivalente a comprar: **{cantidad:.4f}** acciones. (MXN extraído: ${monto_mxn})")
+                
+                else:
+                    monto_mxn = st.number_input(f"Inversión Libre en Pesos MXN:", min_value=10.0, value=1000.0, step=100.0, format="%.2f")
+                    monto_usd = monto_mxn / usd_mxn_live
+                    cantidad = monto_usd / resultado['Precio']
+                    st.caption(f"≈ Con ${monto_mxn} MXN envías **${monto_usd:.2f} USD** al bróker. Adquieres: **{cantidad:.4f}** acciones.")
 
                 estrategia_compra = st.radio(
                     "Tipo de Operación:",

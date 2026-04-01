@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from yahooquery import Ticker
 from backend import analizar_swing, analizar_value, obtener_dividendos
 from concurrent.futures import ThreadPoolExecutor
 
@@ -129,18 +130,20 @@ def analisis_individual_value(ticker: str):
 @st.cache_data(ttl=30, show_spinner=False)
 def obtener_tipo_cambio():
     try:
-        info = yf.Ticker("MXN=X").fast_info
-        return round(float(info['lastPrice']), 2)
+        info = Ticker("MXN=X").price.get("MXN=X", {})
+        if isinstance(info, str): info = {}
+        return round(float(info.get('regularMarketPrice', 18.20)), 2)
     except:
-        return 17.50
+        return 18.20
 
 
 def _obtener_dividendo_ticker(ticker: str) -> dict:
     """Extrae dividendo por acción y frecuencia de pago de un ticker."""
     try:
-        info = yf.Ticker(ticker).info
-        div_rate  = float(info.get("dividendRate", 0) or 0)      # Dividendo anual por acción
-        freq_num  = info.get("dividendFrequency", None)           # 1=Anual, 4=Trimestral, 12=Mensual
+        summary = Ticker(ticker).summary_detail.get(ticker, {})
+        if isinstance(summary, str): summary = {}
+        div_rate  = float(summary.get("dividendRate", 0) or 0)      # Dividendo anual por acción
+        freq_num  = summary.get("dividendFrequency", None)           # 1=Anual, 4=Trimestral, 12=Mensual
         freq_map  = {1: ("Anual", 1), 2: ("Semi-anual", 2), 4: ("Trimestral", 4), 12: ("Mensual", 12)}
         freq_label, freq_n = freq_map.get(freq_num, ("N/A", 1))
         div_por_pago = div_rate / freq_n if freq_n and div_rate else 0
@@ -164,12 +167,13 @@ def analizar_cartera_viva(df_historial):
         objetivo_pct  = float(row.get('objetivo_pct', 10.0))
 
         try:
-            t = yf.Ticker(ticker)
-            precio_actual = float(t.fast_info['lastPrice'])
-            moneda        = str(t.fast_info.get('currency', 'USD'))
+            price_info = Ticker(ticker).price.get(ticker, {})
+            if isinstance(price_info, str): price_info = {}
+            precio_actual = float(price_info.get('regularMarketPrice', precio_compra))
+            moneda        = str(price_info.get('currency', 'USD'))
         except:
             precio_actual = precio_compra
-            moneda        = "N/A"
+            moneda        = "USD"
 
         valor_actual   = precio_actual * cantidad
         rendimiento    = valor_actual - invertido
