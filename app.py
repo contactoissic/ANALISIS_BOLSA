@@ -103,20 +103,20 @@ with tab_hq:
     # Tipo de cambio cacheado
     usd_mxn = obtener_tipo_cambio()
 
-    # SPY y BTC también cacheados (se extraen dentro de los screeners, reutilizamos)
+    # SPY y BTC: batch fetch con yahooquery
     try:
-        spy_fast  = yf.Ticker("SPY").fast_info
-        spy_price = round(float(spy_fast['lastPrice']), 2)
-        spy_var   = round((spy_price - float(spy_fast['previousClose'])) / float(spy_fast['previousClose']) * 100, 2)
+        from yahooquery import Ticker as _YQ
+        _mkt = _YQ(["SPY", "BTC-USD"]).price
+        _spy = _mkt.get("SPY", {})
+        _btc = _mkt.get("BTC-USD", {})
+        spy_price = round(float(_spy.get("regularMarketPrice", 0)), 2) if isinstance(_spy, dict) else 0
+        spy_prev  = float(_spy.get("regularMarketPreviousClose", spy_price)) if isinstance(_spy, dict) else spy_price
+        spy_var   = round((spy_price - spy_prev) / spy_prev * 100, 2) if spy_prev else 0
+        btc_price = round(float(_btc.get("regularMarketPrice", 0)), 2) if isinstance(_btc, dict) else 0
+        btc_prev  = float(_btc.get("regularMarketPreviousClose", btc_price)) if isinstance(_btc, dict) else btc_price
+        btc_var   = round((btc_price - btc_prev) / btc_prev * 100, 2) if btc_prev else 0
     except:
-        spy_price = 0; spy_var = 0
-
-    try:
-        btc_fast  = yf.Ticker("BTC-USD").fast_info
-        btc_price = round(float(btc_fast['lastPrice']), 2)
-        btc_var   = round((btc_price - float(btc_fast['previousClose'])) / float(btc_fast['previousClose']) * 100, 2)
-    except:
-        btc_price = 0; btc_var = 0
+        spy_price = 0; spy_var = 0; btc_price = 0; btc_var = 0
 
     c1, c2, c3, c4 = st.columns(4)
     for col, lbl, val, sub in [

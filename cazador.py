@@ -111,10 +111,44 @@ def buscar_value_investing():
 
 @st.cache_data(ttl=600, show_spinner=False)
 def buscar_dividendos():
-    df = _run_parallel(obtener_dividendos, TICKERS_DIVIDENDOS)
-    if df.empty:
+    """Obtiene dividendos en un solo batch request - mucho más rápido y sin bloqueos."""
+    try:
+        t = Ticker(TICKERS_DIVIDENDOS)
+        summary = t.summary_detail
+        price_data = t.price
+        
+        rows = []
+        for ticker in TICKERS_DIVIDENDOS:
+            sd = summary.get(ticker, {})
+            pr = price_data.get(ticker, {})
+            if not isinstance(sd, dict) or not isinstance(pr, dict):
+                continue
+            
+            yield_pct = sd.get("dividendYield", 0) or 0
+            yield_pct = round(float(yield_pct) * 100, 2)
+            div_rate  = sd.get("dividendRate", 0) or 0
+            ex_date   = sd.get("exDividendDate", None)
+            ex_str    = str(ex_date).split(" ")[0] if ex_date else "N/A"
+            nombre    = pr.get("longName", pr.get("shortName", ticker))
+            moneda    = pr.get("currency", "USD")
+            
+            freq_num  = sd.get("dividendFrequency", None)
+            freq_map  = {1: "Anual", 2: "Semi-anual", 4: "Trimestral", 12: "Mensual"}
+            frecuencia = freq_map.get(freq_num, "N/A")
+            
+            rows.append({
+                "Ticker": ticker, "Nombre": nombre, "Moneda": moneda,
+                "Paga_Dividendos": "\u2705 S\u00cd" if yield_pct > 0 else "\u274c NO",
+                "Yield_Anual_%": yield_pct,
+                "Dividendo_x_Accion": round(float(div_rate), 4),
+                "Frecuencia": frecuencia,
+                "Ex-Dividend_Date": ex_str,
+            })
+        
+        df = pd.DataFrame(rows)
+        return df[df["Yield_Anual_%"] > 0].sort_values("Yield_Anual_%", ascending=False)
+    except Exception as e:
         return pd.DataFrame()
-    return df[df["Yield_Anual_%"] > 0].sort_values("Yield_Anual_%", ascending=False)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -153,11 +187,19 @@ def _obtener_dividendo_ticker(ticker: str) -> dict:
 
 
 def analizar_cartera_viva(df_historial):
-    """Sin caché porque los precios de la cartera personal deben ser siempre frescos."""
+    """Batch-fetch de precios para calcular rentabilidad en tiempo real."""
     from backend import analizar_swing as sw
     datos = []
     if df_historial.empty:
         return pd.DataFrame()
+    
+    # ── Batch fetch de precios actuales para todos los tickers de golpe ──
+    tickers_cartera = df_historial['ticker'].unique().tolist()
+    try:
+        batch_prices = Ticker(tickers_cartera).price
+    except:
+        batch_prices = {}
+    
     for _, row in df_historial.iterrows():
         ticker        = row['ticker']
         precio_compra = float(row['precio_ejecucion'])
@@ -166,12 +208,11 @@ def analizar_cartera_viva(df_historial):
         estrategia    = str(row.get('estrategia', 'SWING')).upper()
         objetivo_pct  = float(row.get('objetivo_pct', 10.0))
 
-        try:
-            price_info = Ticker(ticker).price.get(ticker, {})
-            if isinstance(price_info, str): price_info = {}
+        price_info = batch_prices.get(ticker, {})
+        if isinstance(price_info, dict) and price_info.get('regularMarketPrice'):
             precio_actual = float(price_info.get('regularMarketPrice', precio_compra))
             moneda        = str(price_info.get('currency', 'USD'))
-        except:
+        else:
             precio_actual = precio_compra
             moneda        = "USD"
 
@@ -190,7 +231,7 @@ def analizar_cartera_viva(df_historial):
             f"Objetivo: {precio_objetivo:.2f}" if estrategia == "SWING" else "—"
         )
 
-        # ── Dividendos ──
+        # ── Dividendos via batch summary ──
         div_info         = _obtener_dividendo_ticker(ticker)
         div_anual_total  = round(div_info["div_anual"] * cantidad, 4)
         div_pago_total   = round(div_info["div_por_pago"] * cantidad, 4)
